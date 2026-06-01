@@ -5,7 +5,7 @@
      public static final Component DUPLICATE_LOGIN_DISCONNECT_MESSAGE = Component.translatable("multiplayer.disconnect.duplicate_login");
      private static final Logger LOGGER = LogUtils.getLogger();
 -    public static final int SEND_PLAYER_INFO_INTERVAL = 600;
-+    public static final int SEND_PLAYER_INFO_INTERVAL = io.canvasmc.canvas.Config.INSTANCE.networking.playerInfoSendInterval; // Canvas - optimize playerlist tick
++    public static final int SEND_PLAYER_INFO_INTERVAL = io.canvasmc.canvas.GlobalConfiguration.getInstance().networking.playerInfoSendInterval; // Canvas - optimize playerlist tick
      private static final ThreadLocal<SimpleDateFormat> BAN_DATE_FORMAT = ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm:ss z", Locale.ROOT)); // Folia - region threading - SDF is not thread-safe
      private final MinecraftServer server;
      public final List<ServerPlayer> players = new java.util.concurrent.CopyOnWriteArrayList(); // CraftBukkit - ArrayList -> CopyOnWriteArrayList: Iterator safety
@@ -26,16 +26,16 @@
                  return false;
              }
              this.usersCountedAgainstLimit.add(conn);
-@@ -258,7 +_,7 @@
-                 !immediateRespawn,
-                 doLimitedCrafting,
-                 player.createCommonSpawnInfo(level),
+@@ -256,7 +_,7 @@
+                 !flag,
+                 flag2,
+                 player.createCommonSpawnInfo(serverLevel),
 -                this.server.enforceSecureProfile()
-+                io.canvasmc.canvas.Config.INSTANCE.enableNoChatReports || this.server.enforceSecureProfile() // Canvas - no chat reports
++                io.canvasmc.canvas.GlobalConfiguration.getInstance().chat.disableChatReporting || this.server.enforceSecureProfile() // Canvas - no chat reports
              )
          );
          player.getBukkitEntity().sendSupportedChannels(); // CraftBukkit
-@@ -292,6 +_,8 @@
+@@ -290,6 +_,8 @@
  
          // player.connection.send(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(this.players)); // CraftBukkit - replaced with loop below
          this.players.add(player);
@@ -44,15 +44,15 @@
          this.playersByName.put(player.getScoreboardName().toLowerCase(java.util.Locale.ROOT), player); // Spigot
          this.playersByUUID.put(player.getUUID(), player);
          // this.broadcastAll(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(List.of(player))); // CraftBukkit - replaced with loop below
-@@ -498,6 +_,7 @@
-         if (advancements != null) {
-             advancements.save();
+@@ -492,6 +_,7 @@
+         if (playerAdvancements != null) {
+             playerAdvancements.save();
          }
 +        new io.canvasmc.canvas.event.PlayerSaveEvent(player.getBukkitEntity(), false).callEvent(); // Canvas - player save event
      }
  
-     public net.kyori.adventure.text.@Nullable Component remove(final ServerPlayer player) { // CraftBukkit - return string // Paper - return Component
-@@ -566,6 +_,7 @@
+     public net.kyori.adventure.text.@Nullable Component remove(ServerPlayer player) { // CraftBukkit - return string // Paper - return Component
+@@ -561,6 +_,7 @@
          player.getBukkitEntity().packetProcessor.close(); // Folia - region threading
          player.getAdvancements().stopListening();
          this.players.remove(player);
@@ -60,7 +60,7 @@
          this.playersByName.remove(player.getScoreboardName().toLowerCase(java.util.Locale.ROOT)); // Spigot
          this.server.getCustomBossEvents().onPlayerDisconnect(player);
          UUID uuid = player.getUUID();
-@@ -593,6 +_,7 @@
+@@ -588,6 +_,7 @@
          // This removes the scoreboard (and player reference) for the specific player in the manager
          this.cserver.getScoreboardManager().removePlayer(player.getBukkitEntity());
          // CraftBukkit end
@@ -68,12 +68,12 @@
          return playerQuitEvent.quitMessage(); // Paper - Adventure
      }
  
-@@ -801,6 +_,20 @@
+@@ -800,6 +_,20 @@
      }
  
      public void tick() {
 +        // Canvas start - optimize playerlist tick
-+        if (io.canvasmc.canvas.Config.INSTANCE.networking.optimizePlayerListTicking) {
++        if (io.canvasmc.canvas.GlobalConfiguration.getInstance().networking.alternativePlayerListTick) {
 +            PlayerListBucket bucket = this.canvas$infoBuckets[this.sendAllPlayerInfoIn];
 +
 +            if (bucket != null) {
@@ -89,7 +89,7 @@
          if (++this.sendAllPlayerInfoIn > 600) {
              // CraftBukkit start
              ServerPlayer[] players = this.players.toArray(new ServerPlayer[0]); // Folia - region threading
-@@ -812,6 +_,61 @@
+@@ -811,6 +_,61 @@
              this.sendAllPlayerInfoIn = 0;
          }
      }
@@ -151,29 +151,38 @@
  
      // CraftBukkit start - add a world/entity limited version
      public void broadcastAll(Packet packet, net.minecraft.world.entity.player.Player entityhuman) {
-@@ -1026,16 +_,19 @@
-         final Packet<?> packet
-     ) {
-         for (ServerPlayer player : this.players) { // Folia - region threading
+@@ -944,7 +_,7 @@
+         } // Paper - Add sendOpLevel API
+         // Purpur start - Barrels and enderchests 6 rows
+ 
+-        if (io.canvasmc.canvas.Config.INSTANCE.containers.enderChestSixRows && io.canvasmc.canvas.Config.INSTANCE.containers.enderChestPermissionRows) {
++        if (io.canvasmc.canvas.GlobalConfiguration.getInstance().purpurContainers.enderChestSixRows && io.canvasmc.canvas.GlobalConfiguration.getInstance().purpurContainers.enderChestPermissionRows) {
+             org.bukkit.craftbukkit.entity.CraftHumanEntity bukkit = player.getBukkitEntity();
+             if (bukkit.hasPermission("purpur.enderchest.rows.six")) {
+                 player.sixRowEnderchestSlotCount = 54;
+@@ -1017,16 +_,19 @@
+ 
+     public void broadcast(@Nullable Player except, double x, double y, double z, double radius, ResourceKey<Level> dimension, Packet<?> packet) {
+         for (ServerPlayer serverPlayer : this.players) { // Folia - region threading
 -            // CraftBukkit start - Test if player receiving packet can see the source of the packet
--            if (except != null && !player.getBukkitEntity().canSee(except.getBukkitEntity())) {
+-            if (except != null && !serverPlayer.getBukkitEntity().canSee(except.getBukkitEntity())) {
 -               continue;
 -            }
 -            // CraftBukkit end
 +            // Canvas - optimize - move down
-             if (player != except && player.level().dimension() == dimension) {
-                 double xd = x - player.getX();
-                 double yd = y - player.getY();
-                 double zd = z - player.getZ();
-                 if (xd * xd + yd * yd + zd * zd < range * range) {
-+                    // Canvas start - from above
+             if (serverPlayer != except && serverPlayer.level().dimension() == dimension) {
+                 double d = x - serverPlayer.getX();
+                 double d1 = y - serverPlayer.getY();
+                 double d2 = z - serverPlayer.getZ();
+                 if (d * d + d1 * d1 + d2 * d2 < radius * radius) {
++                    // Canvas start - optimize - moved down
 +                    // CraftBukkit start - Test if player receiving packet can see the source of the packet
-+                    if (except != null && !player.getBukkitEntity().canSee(except.getBukkitEntity())) {
++                    if (except != null && !serverPlayer.getBukkitEntity().canSee(except.getBukkitEntity())) {
 +                        continue;
 +                    }
 +                    // CraftBukkit end
-+                    // Canvas end - from above
-                     player.connection.send(packet);
++                    // Canvas end - optimize - moved down
+                     serverPlayer.connection.send(packet);
                  }
              }
 @@ -1053,13 +_,13 @@
@@ -193,37 +202,37 @@
                  this.save(player);
                  if (interval != -1 && ++numSaved >= io.papermc.paper.configuration.GlobalConfiguration.get().playerAutoSave.maxPerTick()) {
                      break;
-@@ -1270,6 +_,7 @@
+@@ -1264,6 +_,7 @@
      }
  
-     public boolean verifyChatTrusted(final PlayerChatMessage message) {
-+        if (io.canvasmc.canvas.Config.INSTANCE.enableNoChatReports) return true; // Canvas - no chat reports
+     public boolean verifyChatTrusted(PlayerChatMessage message) {
++        if (io.canvasmc.canvas.GlobalConfiguration.getInstance().chat.disableChatReporting) return true; // Canvas - no chat reports
          return message.hasSignature() && !message.hasExpiredServer(Instant.now());
      }
  
-@@ -1330,7 +_,12 @@
+@@ -1324,7 +_,12 @@
          //this.broadcastAll(new ClientboundSetChunkCacheRadiusPacket(viewDistance)); // Paper - rewrite chunk system
  
-         for (ServerLevel level : this.server.getAllLevels()) {
--            level.getChunkSource().setViewDistance(viewDistance);
+         for (ServerLevel serverLevel : this.server.getAllLevels()) {
+-            serverLevel.getChunkSource().setViewDistance(viewDistance);
 +            // Canvas start - per world distance
-+            io.canvasmc.canvas.world.PerWorldDistanceConfig distanceConfig = level.serverLevelData.canvas$distanceConfig;
++            io.canvasmc.canvas.world.PerWorldDistanceConfig distanceConfig = serverLevel.serverLevelData.canvas$distanceConfig;
 +            if (!distanceConfig.isViewDistanceOverridden()) {
-+                level.getChunkSource().setViewDistance(viewDistance);
++                serverLevel.getChunkSource().setViewDistance(viewDistance);
 +            }
 +            // Canvas end - per world distance
          }
      }
  
-@@ -1339,7 +_,12 @@
+@@ -1333,7 +_,12 @@
          //this.broadcastAll(new ClientboundSetSimulationDistancePacket(simulationDistance)); // Paper - rewrite chunk system
  
-         for (ServerLevel level : this.server.getAllLevels()) {
--            level.getChunkSource().setSimulationDistance(simulationDistance);
+         for (ServerLevel serverLevel : this.server.getAllLevels()) {
+-            serverLevel.getChunkSource().setSimulationDistance(simulationDistance);
 +            // Canvas start - per world distance
-+            io.canvasmc.canvas.world.PerWorldDistanceConfig distanceConfig = level.serverLevelData.canvas$distanceConfig;
++            io.canvasmc.canvas.world.PerWorldDistanceConfig distanceConfig = serverLevel.serverLevelData.canvas$distanceConfig;
 +            if (!distanceConfig.isSimulationDistanceOverridden()) {
-+                level.getChunkSource().setSimulationDistance(simulationDistance);
++                serverLevel.getChunkSource().setSimulationDistance(simulationDistance);
 +            }
 +            // Canvas end - per world distance
          }
