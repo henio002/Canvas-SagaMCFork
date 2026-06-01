@@ -3,8 +3,7 @@ name: Build SagaMC
 on:
   push:
     branches:
-      - main
-      - master
+      - ver/1.21.11
   pull_request:
   workflow_dispatch:
 
