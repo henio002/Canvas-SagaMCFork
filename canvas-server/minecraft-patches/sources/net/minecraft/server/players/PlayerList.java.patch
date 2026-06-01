@@ -35,10 +35,11 @@
              )
          );
          player.getBukkitEntity().sendSupportedChannels(); // CraftBukkit
-@@ -290,6 +_,7 @@
+@@ -290,6 +_,8 @@
  
          // player.connection.send(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(this.players)); // CraftBukkit - replaced with loop below
          this.players.add(player);
++        player.lastSave = System.nanoTime(); // Canvas - init lastSave on join
 +        this.canvas$pushToBuckets(player); // Canvas - optimize playerlist tick
          this.playersByName.put(player.getScoreboardName().toLowerCase(java.util.Locale.ROOT), player); // Spigot
          this.playersByUUID.put(player.getUUID(), player);
@@ -184,7 +185,7 @@
                      serverPlayer.connection.send(packet);
                  }
              }
-@@ -1043,9 +_,9 @@
+@@ -1043,9 +_,13 @@
          int numSaved = 0;
          final long now = System.nanoTime(); // Folia - region threading
          long timeInterval = (long)interval * io.papermc.paper.threadedregions.TickRegionScheduler.getTimeBetweenTicks(); // Folia - region threading // Canvas - region threading
@@ -196,6 +197,8 @@
                  continue;
              }
              // Folia end - region threading
+-            if (interval == -1 || now - player.lastSave >= timeInterval) { // Folia - region threading
++            if (interval == -1 || player.lastSave == ServerPlayer.LAST_SAVE_ABSENT || now - player.lastSave >= timeInterval) { // Folia - region threading // Canvas - fix overflow on LAST_SAVE_ABSENT
 @@ -1264,6 +_,7 @@
      }
  
