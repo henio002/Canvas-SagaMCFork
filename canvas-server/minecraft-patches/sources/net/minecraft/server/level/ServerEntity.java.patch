@@ -87,12 +87,12 @@
 -                    Vec3 deltaMovement = this.entity.getDeltaMovement();
 -                    double d = deltaMovement.distanceToSqr(this.lastSentMovement);
 -                    if (d > 1.0E-7 || d > 0.0 && deltaMovement.lengthSqr() == 0.0) {
-+                if (this.entity.needsSync || this.trackDelta || this.entity instanceof LivingEntity && ((LivingEntity)this.entity).isFallFlying() && this.entity.getDeltaMovement() != this.lastSentMovement) { // Canvas - reduce useless move packets
++                if (this.entity.needsSync || this.trackDelta || this.entity instanceof LivingEntity && ((LivingEntity)this.entity).isFallFlying() && this.entity.getDeltaMovement() != this.lastSen[...]
 +                    if (d > 1.0E-7 || d > 0.0 && currentSpeedSqr == 0.0) { // Canvas - use pre-computed values
                          this.lastSentMovement = deltaMovement;
                          if (this.entity instanceof AbstractHurtingProjectile abstractHurtingProjectile) {
                              this.synchronizer
-@@ -210,9 +_,56 @@
+@@ -210,9 +_,60 @@
                                          )
                                      )
                                  );
@@ -123,6 +123,7 @@
 +                               3. Ender Eyes, they depend on their velocity being set bc the packet sets the velocity on the client, but the client doesn't handle the
 +                                    ender eye velocity on its own bc the ender eye velocity is in relation to the stronghold structure which the client doesn't have access to
 +                               4. Shulker bullets use random to determine where they are going, so we need to send velocity packets to ensure it remains smooth on the client
++                               5. Ender Pearls, they need motion sync to ensure smooth visual gameplay
 +
 +                               This filter helps keep unneeded packets reduced, but also ensures that we keep smooth visual gameplay
 +                            */
@@ -140,7 +141,8 @@
 +                                (this.entity instanceof net.minecraft.world.entity.item.ItemEntity && flag1) ||
 +                                this.entity instanceof net.minecraft.world.entity.projectile.EyeOfEnder ||
 +                                this.entity instanceof net.minecraft.world.entity.animal.squid.Squid ||
-+                                this.entity instanceof net.minecraft.world.entity.projectile.ShulkerBullet
++                                this.entity instanceof net.minecraft.world.entity.projectile.ShulkerBullet ||
++                                this.entity instanceof net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnderpearl
 +                            )) {
 +                                this.synchronizer.sendToTrackingPlayers(new ClientboundSetEntityMotionPacket(this.entity.getId(), this.lastSentMovement));
 +                            }
@@ -177,7 +179,7 @@
                  consumer.accept(new ClientboundSetEquipmentPacket(this.entity.getId(), list, true)); // Paper - data sanitization
              }
 -            ((LivingEntity) this.entity).detectEquipmentUpdates(); // CraftBukkit - SPIGOT-3789: sync again immediately after sending
-+            if (this.entity.totalEntityAge == 0) ((LivingEntity) this.entity).detectEquipmentUpdates(); // CraftBukkit - SPIGOT-3789: sync again immediately after sending // Leaves - fix chunk reload detector
++            if (this.entity.totalEntityAge == 0) ((LivingEntity) this.entity).detectEquipmentUpdates(); // CraftBukkit - SPIGOT-3789: sync again immediately after sending // Leaves - fix chunk r[...]
          }
  
          if (!this.entity.getPassengers().isEmpty()) {
