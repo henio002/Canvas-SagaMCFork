@@ -87,7 +87,7 @@
 -                    Vec3 deltaMovement = this.entity.getDeltaMovement();
 -                    double d = deltaMovement.distanceToSqr(this.lastSentMovement);
 -                    if (d > 1.0E-7 || d > 0.0 && deltaMovement.lengthSqr() == 0.0) {
-+                if (this.entity.needsSync || this.trackDelta || this.entity instanceof LivingEntity && ((LivingEntity)this.entity).isFallFlying() && this.entity.getDeltaMovement() != this.lastSen[...]
++                if (this.entity.needsSync || this.trackDelta || this.entity instanceof LivingEntity && ((LivingEntity)this.entity).isFallFlying() && this.entity.getDeltaMovement() != this.lastSentMovement) {
 +                    if (d > 1.0E-7 || d > 0.0 && currentSpeedSqr == 0.0) { // Canvas - use pre-computed values
                          this.lastSentMovement = deltaMovement;
                          if (this.entity instanceof AbstractHurtingProjectile abstractHurtingProjectile) {
@@ -179,7 +179,7 @@
                  consumer.accept(new ClientboundSetEquipmentPacket(this.entity.getId(), list, true)); // Paper - data sanitization
              }
 -            ((LivingEntity) this.entity).detectEquipmentUpdates(); // CraftBukkit - SPIGOT-3789: sync again immediately after sending
-+            if (this.entity.totalEntityAge == 0) ((LivingEntity) this.entity).detectEquipmentUpdates(); // CraftBukkit - SPIGOT-3789: sync again immediately after sending // Leaves - fix chunk r[...]
++            if (this.entity.totalEntityAge == 0) ((LivingEntity) this.entity).detectEquipmentUpdates(); // CraftBukkit - SPIGOT-3789: sync again immediately after sending // Leaves - fix chunk r
          }
  
          if (!this.entity.getPassengers().isEmpty()) {
